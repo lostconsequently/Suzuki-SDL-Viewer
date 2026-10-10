@@ -22,13 +22,12 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 ## Hardware
 
 - **Cable:** "VAG KKL 409.1" USB cable with a genuine **FTDI FT232R** chip (needed for the non-standard 7812 baud).
-- **Connector:** on this car the SDL line is on **pin 9** of the 16-pin diagnostic connector, while the KKL cable reads its K-line on **pin 7**. Bridge pin 9 to pin 7 (for example in an adapter).
-- **Ignition on**, engine off or running.
+- **Connector:** on this car the SDL line is on **pin 9** of the 16-pin diagnostic connector, while the KKL cable reads its K-line on **pin 7**. Bridge pin 9 to pin 7 (for example with a OBD2 break out box).
 
 ## Usage
 
 1. Plug in the cable and switch the ignition on. Close any other program that uses the cable.
-2. Start `SDLView.exe` (or `python sdlview.py`). The FTDI port is selected automatically.
+2. Start `SDLView.exe`.
 3. Click **Connect**.
 
 Logs are written to `logs\` next to the executable, or to `Documents\SDLView logs` if that folder is not writable. Windows SmartScreen may warn about an unsigned app the first time: *More info → Run anyway*.
