@@ -1,0 +1,12 @@
+# PyInstaller output
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Logs written by the app
+logs/
