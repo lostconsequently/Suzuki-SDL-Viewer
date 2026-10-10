@@ -77,13 +77,6 @@ Logs are written to `logs\` next to the executable, or to `Documents\SDLView log
 
 "Confirmed" means checked on the car against measurements, a multimeter or a reference scan tool.
 
-## Building and testing
-
-- **Build:** double-click `build.bat`. It installs `pyserial` and `pyinstaller` (`pip --user`) and creates `dist\SDLView.exe`.
-- **Run from source:** Python 3.10+ and `pip install pyserial`, then `python sdlview.py`.
-- **Tests (no hardware):** `python tests\test_scenarios.py`. A simulated ECU covers lost acks, unconfirmed restores, partial replies, a pulled cable and safe closing.
-- **Logo:** `assets\make_icon.py` regenerates `assets\sdlview.ico` and `assets\sdlview.png` without extra libraries.
-
 ## Credits
 
 - [thatdevsherry/suzuki_sdl](https://github.com/thatdevsherry/suzuki_sdl): the initial SDL address map and frame format (Suzuki Baleno).
