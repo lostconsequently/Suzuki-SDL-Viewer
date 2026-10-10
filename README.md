@@ -19,8 +19,6 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | **Logging** | CSV with every raw byte plus the converted values |
 | **Idle command** | Temporarily sets the ECU's target idle speed (600–1600 rpm). It is restored automatically on disconnect, on closing, above 2500 rpm, or when the engine stalls. Unconfirmed restores are retried and reported |
 
-Dark theme, single `.exe`, no installation, no Python needed to run it.
-
 ## Hardware
 
 - **Cable:** "VAG KKL 409.1" USB cable with a genuine **FTDI FT232R** chip (needed for the non-standard 7812 baud).
