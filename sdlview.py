@@ -264,16 +264,16 @@ class Link(threading.Thread):
 # ---------------------------------------------------------------- conversions
 
 def temp_c(raw: int) -> float:
-    return raw / 255 * 159 - 40
+    return raw * 0.625 - 40
 
 
 def pressure_mbar(raw: int) -> float:
-    return raw / 255 * 1666.3 - 200
+    return raw * 6.4844 - 193.33
 
 
 def derive(v: dict, history: deque) -> dict:
     """Converted values. history = recent (t, values) for the RPM median and the full injector pulse."""
-    rpms = [((h[0x04] & 0x3F) * 256 + h[0x05]) / 5.1 for _, h in history if h[0x04] & 0xC0 == 0]
+    rpms = [((h[0x04] & 0x3F) * 256 + h[0x05]) * 0.195 for _, h in history if h[0x04] & 0xC0 == 0]
     injs = [((h[0x0D] << 8) | h[0x0E]) * 0.002 for _, h in history]
     return {
         "rpm": statistics.median(rpms) if rpms else None,  # None = no valid sample in the window
@@ -283,16 +283,16 @@ def derive(v: dict, history: deque) -> dict:
         "iat": temp_c(v[0x09]),
         "map": pressure_mbar(v[0x10]),
         "baro": pressure_mbar(v[0x11]),
-        "tps_v": v[0x0B] / 255 * 5,
+        "tps_v": v[0x0B] * 5 / 256,
         "tps_angle": v[0x0A],
         "isc": math.floor(v[0x12] / 255 * 100),
         "inj": max(injs) if injs else 0.0,
-        "adv": v[0x0F] / 255 * 90 - 12,
+        "adv": v[0x0F] * 0.35 - 11.7,
         "adv_raw": v[0x0F],
         "batt": v[0x16] * 20 / 256,
         "ctp": bool(v[0x18] & 0x10),
         "fan": v[0x19] == 128,
-        "o2": v[0x0C] / 255 * 5,             # oxygen sensor voltage (switches 0.1-0.9 V when warm)
+        "o2": v[0x0C] * 5 / 256,             # oxygen sensor voltage (switches 0.1-0.9 V when warm)
         "stft": (v[0x13] - 128) / 128 * 100,  # short-term fuel trim, 128 = no correction
         "ltft": (v[0x14] - 128) / 128 * 100,  # long-term fuel trim, 128 = no correction
     }
@@ -315,13 +315,13 @@ TILES = [  # key, title, unit, format, unconfirmed formula
     ("target_idle", "Target idle", "rpm", "{:.0f}", False),
     ("ect", "Coolant temp", "°C", "{:.0f}", False),
     ("iat", "Intake air temp", "°C", "{:.0f}", False),
-    ("map", "MAP", "mbar", "{:.0f}", True),
-    ("baro", "Barometric", "mbar", "{:.0f}", True),
+    ("map", "MAP", "mbar", "{:.0f}", False),
+    ("baro", "Barometric", "mbar", "{:.0f}", False),
     ("tps_v", "Throttle", "V", "{:.2f}", False),
     ("tps_angle", "Throttle angle", "raw", "{:.0f}", False),
     ("isc", "ISC duty", "%", "{:.0f}", False),
     ("inj", "Injector pulse", "ms", "{:.2f}", False),
-    ("adv", "Ignition advance", "° (raw)", "{:.0f}", True),
+    ("adv", "Ignition advance", "° BTDC (raw)", "{:.0f}", False),
     ("batt", "Battery", "V", "{:.2f}", False),
     ("ctp", "Closed throttle", "CTP switch", "{}", False),
     ("fan", "Radiator fan", "", "{}", False),
@@ -838,7 +838,7 @@ class App:
         self.log_writer = csv.writer(self.log_file)
         self.log_writer.writerow(["time", "ecu"] + [f"0x{a:02X}" for a in ADDRS] +
                                  ["rpm", "target_idle", "coolant_c", "iat_c", "map_mbar", "baro_mbar", "tps_v",
-                                  "tps_angle", "isc_pct", "inj_ms", "advance_unconfirmed", "battery_v", "ctp", "fan",
+                                  "tps_angle", "isc_pct", "inj_ms", "advance_deg", "battery_v", "ctp", "fan",
                                   "o2_v", "stft_pct", "ltft_pct", "current_codes", "stored_codes"])
         self.log_btn.configure(text="Stop log")
         self.log_var.set(f"Logging to {path.name}")

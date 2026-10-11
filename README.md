@@ -48,15 +48,15 @@ Logs are written to `logs\` next to the executable, or to `Documents\SDLView log
 |---|---|---|---|
 | `0x00` / `0x01` | Current fault bits | see fault table | confirmed |
 | `0x02` / `0x03` | Stored fault bits | same layout as `0x00` / `0x01` | confirmed |
-| `0x04` / `0x05` | Engine speed | `((hi & 0x3F)·256 + lo) / 5.1`; skip samples with `hi & 0xC0` set | confirmed |
+| `0x04` / `0x05` | Engine speed | `((hi & 0x3F)·256 + lo) · 0.195`; skip samples with `hi & 0xC0` set | confirmed |
 | `0x06` | Target idle | `x · 7.84375` rpm | confirmed |
 | `0x07` | Vehicle speed | `x` km/h | |
-| `0x08` / `0x09` | Coolant / intake air temp | `x/255 · 159 − 40` °C | confirmed |
-| `0x0A` / `0x0B` | Throttle angle / voltage | raw / `x/255 · 5` V | confirmed |
-| `0x0C` | O2 sensor (bank 1) | `x/255 · 5` V; switches ~0.1–0.9 V at ~1 Hz when warm and in closed loop | confirmed |
+| `0x08` / `0x09` | Coolant / intake air temp | `x · 0.625 − 40` °C | confirmed |
+| `0x0A` / `0x0B` | Throttle angle / voltage | raw / `x · 5/256` V | confirmed |
+| `0x0C` | O2 sensor (bank 1) | `x · 5/256` V; switches ~0.1–0.9 V at ~1 Hz when warm and in closed loop | confirmed |
 | `0x0D` / `0x0E` | Injector pulse | `(hi·256 + lo) · 0.002` ms | confirmed |
-| `0x0F` | Ignition advance | `x/255 · 90 − 12` ° (correct with engine off only) | unconfirmed |
-| `0x10` / `0x11` | MAP / barometric | `x/255 · 1666.3 − 200` mbar (≈3 mbar high) | unconfirmed |
+| `0x0F` | Ignition advance | `x · 0.35 − 11.7` ° BTDC | confirmed |
+| `0x10` / `0x11` | MAP / barometric | `x · 6.4844 − 193.33` mbar | confirmed |
 | `0x12` | ISC duty | `x/255 · 100` % | confirmed |
 | `0x13` | Short-term fuel trim | `(x − 128)/128 · 100` %; moves in step with the O2 sensor | address confirmed, scale unconfirmed |
 | `0x14` | Long-term fuel trim | `(x − 128)/128 · 100` % | unconfirmed |
