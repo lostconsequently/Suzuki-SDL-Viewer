@@ -292,7 +292,9 @@ def derive(v: dict, history: deque) -> dict:
         "batt": v[0x16] * 20 / 256,
         "ctp": bool(v[0x18] & 0x10),
         "fan": v[0x19] == 128,
-        "mix": (v[0x13], v[0x14], v[0x15]),
+        "o2": v[0x0C] / 255 * 5,             # oxygen sensor voltage (switches 0.1-0.9 V when warm)
+        "stft": (v[0x13] - 128) / 128 * 100,  # short-term fuel trim, 128 = no correction
+        "ltft": (v[0x14] - 128) / 128 * 100,  # long-term fuel trim, 128 = no correction
     }
 
 
@@ -324,8 +326,12 @@ TILES = [  # key, title, unit, format, unconfirmed formula
     ("ctp", "Closed throttle", "CTP switch", "{}", False),
     ("fan", "Radiator fan", "", "{}", False),
     ("vss", "Vehicle speed", "km/h", "{:.0f}", False),
-    ("mix", "Mixture control", "0x13 / 0x14 / 0x15", "{}", True),
+    ("o2", "O2 sensor", "V   (rich > 0.45 > lean)", "{:.2f}", False),
+    ("stft", "Short-term fuel trim", "%   (+ = richer)", "{:+.1f}", True),
+    ("ltft", "Long-term fuel trim", "%   (+ = richer)", "{:+.1f}", True),
 ]
+TILE_COLUMNS = 5
+O2_SWITCH_V = 0.45  # stoichiometric switch point of a zirconia O2 sensor
 
 
 # Graph signals: name -> (unit, default range, getter(derived, raw))
@@ -345,15 +351,24 @@ SIGNALS: dict[str, tuple] = {
     "Closed throttle": ("on/off", (0, 1), lambda d, v: 1.0 if d["ctp"] else 0.0),
     "Radiator fan": ("on/off", (0, 1), lambda d, v: 1.0 if d["fan"] else 0.0),
     "Vehicle speed": ("km/h", (0, 150), lambda d, v: d["vss"]),
-    "Mixture 0x13": ("raw", (0, 255), lambda d, v: v[0x13]),
-    "Mixture 0x14": ("raw", (0, 255), lambda d, v: v[0x14]),
-    "Mixture 0x15": ("raw", (0, 255), lambda d, v: v[0x15]),
+    "O2 sensor": ("V", (0, 1), lambda d, v: d["o2"]),
+    "Short-term trim": ("%", (-25, 25), lambda d, v: d["stft"]),
+    "Long-term trim": ("%", (-25, 25), lambda d, v: d["ltft"]),
 }
 for _a in ADDRS:
     SIGNALS[f"Raw 0x{_a:02X}"] = ("raw", (0, 255), lambda d, v, a=_a: v[a])
 NO_SIGNAL = "—"
-DEFAULT_CHANNELS = ["Engine speed", "ISC duty", "Injector pulse", "Coolant temp"]
+DEFAULT_CHANNELS = ["Engine speed", "O2 sensor", "Short-term trim", "ISC duty"]
 WINDOWS = {"10 s": 10, "30 s": 30, "1 min": 60, "2 min": 120, "5 min": 300}
+
+
+def format_value(value: float) -> str:
+    """Readable number for the graph labels: more decimals for small values."""
+    if abs(value) < 10:
+        return f"{value:.2f}"
+    if abs(value) < 100:
+        return f"{value:.1f}"
+    return f"{value:.0f}"
 
 
 class GraphTab:
@@ -486,7 +501,7 @@ class GraphTab:
                     y = y1 - (val - lo) / (hi - lo) * (y1 - y0)
                     segment += [x, min(max(y, y0), y1)]
             current = pts[-1][1][name] if pts else None  # newest point; None = no valid value now
-            self.value_labels[ch].configure(text="--" if current is None else f"{current:.4g} {unit}")
+            self.value_labels[ch].configure(text="--" if current is None else f"{format_value(current)} {unit}")
         for ch, var in enumerate(self.channels):
             if var.get() == NO_SIGNAL:
                 self.value_labels[ch].configure(text="")
@@ -667,7 +682,7 @@ class App:
         for n, (key, title, unit, _, unconfirmed) in enumerate(TILES):
             tile = tk.Frame(frame, bg=C["tile"], padx=12, pady=8, highlightthickness=1,
                             highlightbackground=C["border"])
-            tile.grid(row=n // 4, column=n % 4, sticky="nsew", padx=5, pady=5)
+            tile.grid(row=n // TILE_COLUMNS, column=n % TILE_COLUMNS, sticky="nsew", padx=5, pady=5)
             head = tk.Frame(tile, bg=C["tile"])
             head.pack(fill="x")
             tk.Label(head, text=title, fg=C["muted"], bg=C["tile"], font=("Segoe UI", 10)).pack(side="left")
@@ -677,12 +692,14 @@ class App:
             val.pack(anchor="w")
             tk.Label(tile, text=unit, fg=C["dim"], bg=C["tile"], font=("Segoe UI", 9)).pack(anchor="w")
             self.tiles[key] = val
-        for c in range(4):
+        rows = -(-len(TILES) // TILE_COLUMNS)
+        for c in range(TILE_COLUMNS):
             frame.columnconfigure(c, weight=1, uniform="tiles")
-        for r in range(4):
+        for r in range(rows):
             frame.rowconfigure(r, weight=1, uniform="tiles")
         tk.Label(frame, text="⚠ = formula not yet confirmed for this ECU (see README)",
-                 fg=C["dim"], bg=C["bg"]).grid(row=4, column=0, columnspan=4, sticky="w", padx=6, pady=(2, 0))
+                 fg=C["dim"], bg=C["bg"]).grid(row=rows, column=0, columnspan=TILE_COLUMNS, sticky="w",
+                                               padx=6, pady=(2, 0))
 
     def _build_faults(self, nb: ttk.Notebook) -> None:
         frame = ttk.Frame(nb, padding=10)
@@ -822,7 +839,7 @@ class App:
         self.log_writer.writerow(["time", "ecu"] + [f"0x{a:02X}" for a in ADDRS] +
                                  ["rpm", "target_idle", "coolant_c", "iat_c", "map_mbar", "baro_mbar", "tps_v",
                                   "tps_angle", "isc_pct", "inj_ms", "advance_unconfirmed", "battery_v", "ctp", "fan",
-                                  "current_codes", "stored_codes"])
+                                  "o2_v", "stft_pct", "ltft_pct", "current_codes", "stored_codes"])
         self.log_btn.configure(text="Stop log")
         self.log_var.set(f"Logging to {path.name}")
 
@@ -845,7 +862,7 @@ class App:
                 ["" if d["rpm"] is None else f"{d['rpm']:.0f}", d["target_idle"], f"{d['ect']:.1f}",
                  f"{d['iat']:.1f}", f"{d['map']:.0f}", f"{d['baro']:.0f}", f"{d['tps_v']:.2f}", d["tps_angle"],
                  d["isc"], f"{d['inj']:.3f}", f"{d['adv']:.1f}", f"{d['batt']:.2f}", int(d["ctp"]), int(d["fan"]),
-                 codes(cur), codes(sto)])
+                 f"{d['o2']:.3f}", f"{d['stft']:.1f}", f"{d['ltft']:.1f}", codes(cur), codes(sto)])
             self.log_rows += 1
             if self.log_rows % 20 == 0:
                 self.log_file.flush()
@@ -950,8 +967,12 @@ class App:
             elif key in ("ctp", "fan"):
                 text = "ON" if val else "OFF"
                 colour = C["ok"] if val else C["muted"]
-            elif key == "mix":
-                text = " / ".join(str(x) for x in val)
+            elif key == "o2":
+                text = fmt.format(val)
+                colour = C["warn"] if val > O2_SWITCH_V else C["accent"]  # amber = rich, blue = lean
+            elif key in ("stft", "ltft"):
+                text = fmt.format(val)
+                colour = C["warn"] if abs(val) > 10 else C["text"]
             elif key == "adv":
                 text = f"{val:.0f} ({d['adv_raw']})"
             else:

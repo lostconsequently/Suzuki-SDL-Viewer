@@ -12,7 +12,7 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 
 | | |
 |---|---|
-| **Dashboard** | Engine speed, target idle, coolant and intake air temperature, MAP and barometric pressure, throttle, ISC duty, injector pulse, ignition advance, battery voltage, closed-throttle switch, radiator fan, mixture control. Values whose formula is not yet confirmed are marked ⚠ |
+| **Dashboard** | Engine speed, target idle, coolant and intake air temperature, MAP and barometric pressure, throttle, ISC duty, injector pulse, ignition advance, battery voltage, closed-throttle switch, radiator fan, O2 sensor (amber = rich, blue = lean), short- and long-term fuel trim. Values whose formula is not yet confirmed are marked ⚠ |
 | **Graph** | Four stacked live line charts. Each channel shows any converted value or any raw address `0x00`–`0x2F`. Time window 10 s – 5 min, auto scale, pause |
 | **Fault codes** | Current and stored codes with descriptions |
 | **Raw** | All 48 addresses as decimal, hex and bits; changes are highlighted |
@@ -53,11 +53,14 @@ Logs are written to `logs\` next to the executable, or to `Documents\SDLView log
 | `0x07` | Vehicle speed | `x` km/h | |
 | `0x08` / `0x09` | Coolant / intake air temp | `x/255 · 159 − 40` °C | confirmed |
 | `0x0A` / `0x0B` | Throttle angle / voltage | raw / `x/255 · 5` V | confirmed |
+| `0x0C` | O2 sensor (bank 1) | `x/255 · 5` V; switches ~0.1–0.9 V at ~1 Hz when warm and in closed loop | confirmed |
 | `0x0D` / `0x0E` | Injector pulse | `(hi·256 + lo) · 0.002` ms | confirmed |
 | `0x0F` | Ignition advance | `x/255 · 90 − 12` ° (correct with engine off only) | unconfirmed |
 | `0x10` / `0x11` | MAP / barometric | `x/255 · 1666.3 − 200` mbar (≈3 mbar high) | unconfirmed |
 | `0x12` | ISC duty | `x/255 · 100` % | confirmed |
-| `0x13`–`0x15` | Mixture control | raw, 128 = neutral | unconfirmed |
+| `0x13` | Short-term fuel trim | `(x − 128)/128 · 100` %; moves in step with the O2 sensor | address confirmed, scale unconfirmed |
+| `0x14` | Long-term fuel trim | `(x − 128)/128 · 100` % | unconfirmed |
+| `0x15` | Fuel trim (total?) | raw, 128 = neutral; follows `0x13` | unconfirmed |
 | `0x16` | Battery | `x · 20/256` V | confirmed |
 | `0x18` | Status | bit 4 = closed-throttle switch | confirmed |
 | `0x19` | Radiator fan | `128` = on | |
