@@ -6,7 +6,6 @@
 
 It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) with SDL ECU ID `1453`**. Other SDL ECUs will connect, but addresses, formulas and fault codes may differ; the app warns when the ECU ID is not `1453`.
 
-> **Disclaimer.** This is a hobby project, not affiliated with Suzuki. The *Idle command* changes how the ECU controls the engine. Use it only with the vehicle parked, and entirely at your own risk.
 
 ## Features
 
@@ -30,8 +29,6 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 2. Plug in the cable and switch the ignition on. Close any other program that uses the cable.
 3. Start `SDLView.exe`.
 4. Click **Connect**.
-
-Logs are written to `logs\` next to the executable, or to `Documents\SDLView logs` if that folder is not writable. Windows SmartScreen may warn about an unsigned app the first time: *More info → Run anyway*.
 
 ## Protocol summary (SDL, ECU 1453)
 
