@@ -1,5 +1,3 @@
-<p align="center"><img src="assets/sdlview.png" width="96" alt="SDLView logo"></p>
-
 # Suzuki-SDL-Viewer
 
 **SDLView** is a lightweight, portable Windows tool that reads live data and fault codes from older Suzuki engine ECUs over the **SDL** (Serial Data Line) diagnostic protocol, using a cheap FTDI-based KKL USB cable.
