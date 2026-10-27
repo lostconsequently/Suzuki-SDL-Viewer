@@ -337,9 +337,9 @@ TILES = [  # key, title, unit, format, unconfirmed formula
 ]
 TILE_COLUMNS = 5
 O2_SWITCH_V = 0.45  # stoichiometric switch point of a zirconia O2 sensor
-GLITCH_RATIO = 1.8  # unfiltered rpm this far above the median counts as a glitch
+GLITCH_RATIO = 1.8  # a single sample this far above both neighbours counts as a glitch
 GLITCH_MIN_RPM = 300  # ignore glitches while cranking or stalled
-GLITCH_WARN = 3  # glitches per minute that turn the tile amber (a wrong distributor rotor gave up to 8)
+GLITCH_WARN = 3  # glitches per minute that turn the tile amber (a wrong distributor rotor gave 4-16)
 
 
 # Graph signals: name -> (unit, default range, getter(derived, raw))
@@ -600,6 +600,7 @@ class App:
         self.prev: dict | None = None
         self.sample_times: deque = deque(maxlen=20)
         self.glitch_times: deque = deque()  # times of rpm glitches in the last minute
+        self.recent_rpm: deque = deque(maxlen=3)  # (t, unfiltered rpm) of the last samples
         self.log_writer = None
         self.log_file = None
         self.log_path: Path | None = None
@@ -773,6 +774,7 @@ class App:
         self.graph.clear()
         self.sample_times.clear()
         self.glitch_times.clear()
+        self.recent_rpm.clear()
         self.prev = None
         self.engine_ran = False
         self.link_error = False
@@ -963,11 +965,7 @@ class App:
                 self.rate_var.set(f"{(len(self.sample_times) - 1) / span:.1f} samples/s")
 
         d = derive(v, self.history)
-        if d["rpm"] and d["rpm_raw"] and d["rpm"] > GLITCH_MIN_RPM and d["rpm_raw"] > GLITCH_RATIO * d["rpm"]:
-            self.glitch_times.append(t)
-        while self.glitch_times and t - self.glitch_times[0] > 60:
-            self.glitch_times.popleft()
-        d["glitches"] = len(self.glitch_times)
+        d["glitches"] = self.count_glitch(t, d["rpm_raw"])
         table = FAULTS_1453  # only ECU 1453 is mapped; other ECUs get a warning in the status bar
         cur = decode_faults(table, 0, v[0x00]) + decode_faults(table, 1, v[0x01])
         sto = decode_faults(table, 2, v[0x02]) + decode_faults(table, 3, v[0x03])
@@ -977,6 +975,18 @@ class App:
         if render:
             self.render(d, v, cur, sto)
         self.prev = v
+
+    def count_glitch(self, t: float, rpm_raw: float | None) -> int:
+        """Rpm glitches in the last minute. A glitch is one sample far above both of its neighbours;
+        a real rev change lasts several samples, so throttle blips are not counted."""
+        self.recent_rpm.append((t, rpm_raw))
+        if len(self.recent_rpm) == 3 and None not in (r for _, r in self.recent_rpm):
+            (_, before), (t_mid, mid), (_, after) = self.recent_rpm
+            if min(before, after) > GLITCH_MIN_RPM and mid > GLITCH_RATIO * max(before, after):
+                self.glitch_times.append(t_mid)
+        while self.glitch_times and t - self.glitch_times[0] > 60:
+            self.glitch_times.popleft()
+        return len(self.glitch_times)
 
     def render(self, d: dict, v: dict, cur: list, sto: list) -> None:
         for key, _, _, fmt, _ in TILES:
