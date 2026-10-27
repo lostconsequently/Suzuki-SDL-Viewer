@@ -64,6 +64,8 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | `0x19` | Radiator fan | `128` = on; stayed `0` up to 84 °C coolant (fan switches on at 97.5 °C) | |
 | `0x23` | Throttle opening level sent to the A/T | `0`–`7`; `0` at closed throttle, rises with throttle opening (`0`–`6` seen) | |
 
+"Confirmed" means checked on the car against measurements, a multimeter or a reference scan tool.
+
 | Byte / bit | Code | Fault |
 |---|---|---|
 | 0 / 0 | 13 | Oxygen (lambda) sensor |
@@ -75,20 +77,6 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | 1 / 2 | 41 | Ignition fail-safe signal |
 | 1 / 3 | 42 | Crank angle sensor (in the distributor) |
 | 1 / 4 | 51 | EGR system |
-
-"Confirmed" means checked on the car against measurements, a multimeter or a reference scan tool.
-
-**Reference values, warm engine at idle** (service manual, selector in P/N, electrical loads off):
-
-| Value | Specification |
-|---|---|
-| Idle speed | 850 ± 50 rpm |
-| MAP | 290 – 480 mbar |
-| Injector pulse | 0.8 – 2.3 ms |
-| ISC position | 20 – 40 % |
-| Short-term / long-term fuel trim | ±20 % / ±15 % |
-| Throttle sensor | 0.98 – 1.02 V with a 3.5 mm gauge between throttle lever and stop screw |
-| Closed-throttle switch (ECU input) | 0 – 1 V closed, 4 – 6 V open |
 
 ## Credits
 
