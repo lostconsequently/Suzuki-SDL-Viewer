@@ -52,17 +52,17 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | `0x08` / `0x09` | Coolant / intake air temp | `x · 0.625 − 40` °C | confirmed |
 | `0x0A` / `0x0B` | Throttle angle / voltage | raw / `x · 5/256` V | confirmed |
 | `0x0C` | O2 sensor (bank 1) | `x · 5/256` V; switches ~0.1–0.9 V at ~1 Hz when warm and in closed loop | confirmed |
-| `0x0D` / `0x0E` | Injector pulse | `(hi·256 + lo) · 0.002` ms | confirmed |
+| `0x0D` / `0x0E` | Injector pulse | `(hi·256 + lo) · 0.002` ms; about 1 in 4 samples reads `0`, so use the maximum over ~1 s | confirmed |
 | `0x0F` | Ignition advance | `x · 0.35 − 11.7` ° BTDC | confirmed |
 | `0x10` / `0x11` | MAP / barometric | `x · 6.4844 − 193.33` mbar | confirmed |
 | `0x12` | ISC position: actual throttle opening within the ISC actuator range | `x/255 · 100` %; follows the TPS, so it is a measured position, not a command | confirmed |
-| `0x13` | Short-term fuel trim | `(x − 128)/128 · 100` %; moves in step with the O2 sensor | address confirmed, scale unconfirmed |
-| `0x14` | Long-term fuel trim | `(x − 128)/128 · 100` % | unconfirmed |
-| `0x15` | Fuel trim (total?) | raw, 128 = neutral; follows `0x13` | unconfirmed |
+| `0x13` | Short-term fuel trim | `(x − 128)/128 · 100` %; rises when the O2 sensor reads lean, falls when it reads rich | address confirmed, scale unconfirmed |
+| `0x14` | Long-term fuel trim | `(x − 128)/128 · 100` %; stayed at `128` in every capture so far | unconfirmed |
+| `0x15` | Fuel trim (total?) | raw, 128 = neutral; follows `0x13` (equal in about half of the samples) | unconfirmed |
 | `0x16` | Battery | `x · 20/256` V | confirmed |
 | `0x18` | Status | bit 4 = closed-throttle switch | confirmed |
-| `0x19` | Radiator fan | `128` = on | |
-| `0x23` | Throttle opening level sent to the A/T | `0`–`7` | |
+| `0x19` | Radiator fan | `128` = on; stayed `0` up to 84 °C coolant (fan switches on at 97.5 °C) | |
+| `0x23` | Throttle opening level sent to the A/T | `0`–`7`; `0` at closed throttle, rises with throttle opening (`0`–`6` seen) | |
 
 | Byte / bit | Code | Fault |
 |---|---|---|
@@ -73,10 +73,22 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | 0 / 6 | 24 | Vehicle speed sensor |
 | 1 / 0, 1 / 1 | 31, 32 | MAP sensor high / low |
 | 1 / 2 | 41 | Ignition fail-safe signal |
-| 1 / 3 | 42 | Crank angle sensor |
+| 1 / 3 | 42 | Crank angle sensor (in the distributor) |
 | 1 / 4 | 51 | EGR system |
 
 "Confirmed" means checked on the car against measurements, a multimeter or a reference scan tool.
+
+**Reference values, warm engine at idle** (service manual, selector in P/N, electrical loads off):
+
+| Value | Specification |
+|---|---|
+| Idle speed | 850 ± 50 rpm |
+| MAP | 290 – 480 mbar |
+| Injector pulse | 0.8 – 2.3 ms |
+| ISC position | 20 – 40 % |
+| Short-term / long-term fuel trim | ±20 % / ±15 % |
+| Throttle sensor | 0.98 – 1.02 V with a 3.5 mm gauge between throttle lever and stop screw |
+| Closed-throttle switch (ECU input) | 0 – 1 V closed, 4 – 6 V open |
 
 ## Credits
 
