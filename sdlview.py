@@ -274,9 +274,11 @@ def pressure_mbar(raw: int) -> float:
 def derive(v: dict, history: deque) -> dict:
     """Converted values. history = recent (t, values) for the RPM median and the full injector pulse."""
     rpms = [((h[0x04] & 0x3F) * 256 + h[0x05]) * 0.195 for _, h in history if h[0x04] & 0xC0 == 0]
+    rpm_raw = ((v[0x04] & 0x3F) * 256 + v[0x05]) * 0.195 if v[0x04] & 0xC0 == 0 else None
     injs = [((h[0x0D] << 8) | h[0x0E]) * 0.002 for _, h in history]
     return {
         "rpm": statistics.median(rpms) if rpms else None,  # None = no valid sample in the window
+        "rpm_raw": rpm_raw,                  # this sample only, unfiltered (shows speed-signal glitches)
         "target_idle": math.floor(v[0x06] * 7.84375),
         "vss": v[0x07],
         "ect": temp_c(v[0x08]),
@@ -285,7 +287,7 @@ def derive(v: dict, history: deque) -> dict:
         "baro": pressure_mbar(v[0x11]),
         "tps_v": v[0x0B] * 5 / 256,
         "tps_angle": v[0x0A],
-        "isc": math.floor(v[0x12] / 255 * 100),
+        "isc": math.floor(v[0x12] / 255 * 100),  # actual throttle opening within the ISC range (follows TPS)
         "inj": max(injs) if injs else 0.0,
         "adv": v[0x0F] * 0.35 - 11.7,
         "adv_raw": v[0x0F],
@@ -295,6 +297,7 @@ def derive(v: dict, history: deque) -> dict:
         "o2": v[0x0C] * 5 / 256,             # oxygen sensor voltage (switches 0.1-0.9 V when warm)
         "stft": (v[0x13] - 128) / 128 * 100,  # short-term fuel trim, 128 = no correction
         "ltft": (v[0x14] - 128) / 128 * 100,  # long-term fuel trim, 128 = no correction
+        "at_level": v[0x23],                 # throttle opening level sent to the A/T, 0-7
     }
 
 
@@ -319,9 +322,9 @@ TILES = [  # key, title, unit, format, unconfirmed formula
     ("baro", "Barometric", "mbar", "{:.0f}", False),
     ("tps_v", "Throttle", "V", "{:.2f}", False),
     ("tps_angle", "Throttle angle", "raw", "{:.0f}", False),
-    ("isc", "ISC duty", "%", "{:.0f}", False),
+    ("isc", "ISC position", "%", "{:.0f}", False),
     ("inj", "Injector pulse", "ms", "{:.2f}", False),
-    ("adv", "Ignition advance", "° BTDC (raw)", "{:.0f}", False),
+    ("adv", "Ignition advance", "° BTDC", "{:.0f}", False),
     ("batt", "Battery", "V", "{:.2f}", False),
     ("ctp", "Closed throttle", "CTP switch", "{}", False),
     ("fan", "Radiator fan", "", "{}", False),
@@ -329,14 +332,21 @@ TILES = [  # key, title, unit, format, unconfirmed formula
     ("o2", "O2 sensor", "V   (rich > 0.45 > lean)", "{:.2f}", False),
     ("stft", "Short-term fuel trim", "%   (+ = richer)", "{:+.1f}", True),
     ("ltft", "Long-term fuel trim", "%   (+ = richer)", "{:+.1f}", True),
+    ("at_level", "A/T throttle level", "0 – 7", "{:.0f}", False),
+    ("glitches", "RPM glitches", "per minute   (speed signal spikes)", "{:.0f}", False),
 ]
 TILE_COLUMNS = 5
 O2_SWITCH_V = 0.45  # stoichiometric switch point of a zirconia O2 sensor
+GLITCH_RATIO = 1.8  # unfiltered rpm this far above the median counts as a glitch
+GLITCH_MIN_RPM = 300  # ignore glitches while cranking or stalled
+GLITCH_WARN = 3  # glitches per minute that turn the tile amber (a wrong distributor rotor gave up to 8)
 
 
 # Graph signals: name -> (unit, default range, getter(derived, raw))
 SIGNALS: dict[str, tuple] = {
     "Engine speed": ("rpm", (0, 3000), lambda d, v: d["rpm"]),
+    "Engine speed (unfiltered)": ("rpm", (0, 4000), lambda d, v: d["rpm_raw"]),
+    "RPM glitches": ("/min", (0, 20), lambda d, v: d["glitches"]),
     "Target idle": ("rpm", (0, 2000), lambda d, v: d["target_idle"]),
     "Coolant temp": ("°C", (-20, 120), lambda d, v: d["ect"]),
     "Intake air temp": ("°C", (-20, 60), lambda d, v: d["iat"]),
@@ -344,7 +354,7 @@ SIGNALS: dict[str, tuple] = {
     "Barometric": ("mbar", (900, 1100), lambda d, v: d["baro"]),
     "Throttle": ("V", (0, 5), lambda d, v: d["tps_v"]),
     "Throttle angle": ("raw", (0, 160), lambda d, v: d["tps_angle"]),
-    "ISC duty": ("%", (0, 100), lambda d, v: d["isc"]),
+    "ISC position": ("%", (0, 100), lambda d, v: d["isc"]),
     "Injector pulse": ("ms", (0, 20), lambda d, v: d["inj"]),
     "Ignition advance": ("°", (-15, 45), lambda d, v: d["adv"]),
     "Battery": ("V", (8, 16), lambda d, v: d["batt"]),
@@ -354,11 +364,12 @@ SIGNALS: dict[str, tuple] = {
     "O2 sensor": ("V", (0, 1), lambda d, v: d["o2"]),
     "Short-term trim": ("%", (-25, 25), lambda d, v: d["stft"]),
     "Long-term trim": ("%", (-25, 25), lambda d, v: d["ltft"]),
+    "A/T throttle level": ("0-7", (0, 7), lambda d, v: d["at_level"]),
 }
 for _a in ADDRS:
     SIGNALS[f"Raw 0x{_a:02X}"] = ("raw", (0, 255), lambda d, v, a=_a: v[a])
 NO_SIGNAL = "—"
-DEFAULT_CHANNELS = ["Engine speed", "O2 sensor", "Short-term trim", "ISC duty"]
+DEFAULT_CHANNELS = ["Engine speed", "O2 sensor", "Short-term trim", "ISC position"]
 WINDOWS = {"10 s": 10, "30 s": 30, "1 min": 60, "2 min": 120, "5 min": 300}
 
 
@@ -588,6 +599,7 @@ class App:
         self.history: deque = deque()
         self.prev: dict | None = None
         self.sample_times: deque = deque(maxlen=20)
+        self.glitch_times: deque = deque()  # times of rpm glitches in the last minute
         self.log_writer = None
         self.log_file = None
         self.log_path: Path | None = None
@@ -760,6 +772,7 @@ class App:
         self.history.clear()
         self.graph.clear()
         self.sample_times.clear()
+        self.glitch_times.clear()
         self.prev = None
         self.engine_ran = False
         self.link_error = False
@@ -838,8 +851,9 @@ class App:
         self.log_writer = csv.writer(self.log_file)
         self.log_writer.writerow(["time", "ecu"] + [f"0x{a:02X}" for a in ADDRS] +
                                  ["rpm", "target_idle", "coolant_c", "iat_c", "map_mbar", "baro_mbar", "tps_v",
-                                  "tps_angle", "isc_pct", "inj_ms", "advance_deg", "battery_v", "ctp", "fan",
-                                  "o2_v", "stft_pct", "ltft_pct", "current_codes", "stored_codes"])
+                                  "tps_angle", "isc_pos_pct", "inj_ms", "advance_deg", "battery_v", "ctp", "fan",
+                                  "o2_v", "stft_pct", "ltft_pct", "at_level", "rpm_unfiltered", "rpm_glitches_min",
+                                  "current_codes", "stored_codes"])
         self.log_btn.configure(text="Stop log")
         self.log_var.set(f"Logging to {path.name}")
 
@@ -862,7 +876,8 @@ class App:
                 ["" if d["rpm"] is None else f"{d['rpm']:.0f}", d["target_idle"], f"{d['ect']:.1f}",
                  f"{d['iat']:.1f}", f"{d['map']:.0f}", f"{d['baro']:.0f}", f"{d['tps_v']:.2f}", d["tps_angle"],
                  d["isc"], f"{d['inj']:.3f}", f"{d['adv']:.1f}", f"{d['batt']:.2f}", int(d["ctp"]), int(d["fan"]),
-                 f"{d['o2']:.3f}", f"{d['stft']:.1f}", f"{d['ltft']:.1f}", codes(cur), codes(sto)])
+                 f"{d['o2']:.3f}", f"{d['stft']:.1f}", f"{d['ltft']:.1f}", d["at_level"],
+                 "" if d["rpm_raw"] is None else f"{d['rpm_raw']:.0f}", d["glitches"], codes(cur), codes(sto)])
             self.log_rows += 1
             if self.log_rows % 20 == 0:
                 self.log_file.flush()
@@ -948,6 +963,11 @@ class App:
                 self.rate_var.set(f"{(len(self.sample_times) - 1) / span:.1f} samples/s")
 
         d = derive(v, self.history)
+        if d["rpm"] and d["rpm_raw"] and d["rpm"] > GLITCH_MIN_RPM and d["rpm_raw"] > GLITCH_RATIO * d["rpm"]:
+            self.glitch_times.append(t)
+        while self.glitch_times and t - self.glitch_times[0] > 60:
+            self.glitch_times.popleft()
+        d["glitches"] = len(self.glitch_times)
         table = FAULTS_1453  # only ECU 1453 is mapped; other ECUs get a warning in the status bar
         cur = decode_faults(table, 0, v[0x00]) + decode_faults(table, 1, v[0x01])
         sto = decode_faults(table, 2, v[0x02]) + decode_faults(table, 3, v[0x03])
@@ -973,6 +993,9 @@ class App:
             elif key in ("stft", "ltft"):
                 text = fmt.format(val)
                 colour = C["warn"] if abs(val) > 10 else C["text"]
+            elif key == "glitches":
+                text = fmt.format(val)
+                colour = C["warn"] if val >= GLITCH_WARN else C["text"]
             elif key == "adv":
                 text = f"{val:.0f} ({d['adv_raw']})"
             else:

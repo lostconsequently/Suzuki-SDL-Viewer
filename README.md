@@ -11,8 +11,8 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 
 | | |
 |---|---|
-| **Dashboard** | Engine speed, target idle, coolant and intake air temperature, MAP and barometric pressure, throttle, ISC duty, injector pulse, ignition advance, battery voltage, closed-throttle switch, radiator fan, O2 sensor (amber = rich, blue = lean), short- and long-term fuel trim. Values whose formula is not yet confirmed are marked ⚠ |
-| **Graph** | Four stacked live line charts. Each channel shows any converted value or any raw address `0x00`–`0x2F`. Time window 10 s – 5 min, auto scale, pause |
+| **Dashboard** | Engine speed, target idle, coolant and intake air temperature, MAP and barometric pressure, throttle, ISC position, injector pulse, ignition advance, battery voltage, closed-throttle switch, radiator fan, O2 sensor (amber = rich, blue = lean), short- and long-term fuel trim, A/T throttle level, and an **RPM glitch** counter (spikes in the engine speed signal, amber at 3 or more per minute; a wrong distributor rotor caused this on the test car). Values whose formula is not yet confirmed are marked ⚠ |
+| **Graph** | Four stacked live line charts. Each channel shows any converted value (including the unfiltered engine speed) or any raw address `0x00`–`0x2F`. Time window 10 s – 5 min, auto scale, pause |
 | **Fault codes** | Current and stored codes with descriptions |
 | **Raw** | All 48 addresses as decimal, hex and bits; changes are highlighted |
 | **Logging** | CSV with every raw byte plus the converted values |
@@ -55,13 +55,14 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 | `0x0D` / `0x0E` | Injector pulse | `(hi·256 + lo) · 0.002` ms | confirmed |
 | `0x0F` | Ignition advance | `x · 0.35 − 11.7` ° BTDC | confirmed |
 | `0x10` / `0x11` | MAP / barometric | `x · 6.4844 − 193.33` mbar | confirmed |
-| `0x12` | ISC duty | `x/255 · 100` % | confirmed |
+| `0x12` | ISC position: actual throttle opening within the ISC actuator range | `x/255 · 100` %; follows the TPS, so it is a measured position, not a command | confirmed |
 | `0x13` | Short-term fuel trim | `(x − 128)/128 · 100` %; moves in step with the O2 sensor | address confirmed, scale unconfirmed |
 | `0x14` | Long-term fuel trim | `(x − 128)/128 · 100` % | unconfirmed |
 | `0x15` | Fuel trim (total?) | raw, 128 = neutral; follows `0x13` | unconfirmed |
 | `0x16` | Battery | `x · 20/256` V | confirmed |
 | `0x18` | Status | bit 4 = closed-throttle switch | confirmed |
 | `0x19` | Radiator fan | `128` = on | |
+| `0x23` | Throttle opening level sent to the A/T | `0`–`7` | |
 
 | Byte / bit | Code | Fault |
 |---|---|---|
