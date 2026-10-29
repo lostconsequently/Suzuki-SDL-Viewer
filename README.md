@@ -81,6 +81,10 @@ It is built for and tested on a **1997 Suzuki Swift 1.0 (G10A, TBI, automatic) w
 - [thatdevsherry/suzuki_sdl](https://github.com/thatdevsherry/suzuki_sdl): the initial SDL address map and frame format (Suzuki Baleno).
 - Suzuki Swift SF310/SF413 service manual: idle control, CTP switch and ignition specifications.
 
+## AI Disclaimer
+
+The code is completely built by Claude Code
+
 ## License
 
 [MIT](LICENSE)
